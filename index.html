@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Сортировщик — игра по сортировке мусора</title>
+<style>
+:root{--bg:#0f211c;--panel:#17302a;--line:#2b4a42;--ink:#eef4ea;--dim:#9db5aa;--bad:#ff6b5e;--good:#7be495;--gold:#ffd166;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+#app{height:100%;display:flex;flex-direction:column;max-width:900px;margin:0 auto}
+#hud{display:flex;gap:6px;padding:8px;align-items:stretch}
+.st{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 8px;min-width:0}
+.st small{display:block;font-size:11px;color:var(--dim)}
+.st b{font-size:clamp(15px,4.2vw,22px);font-variant-numeric:tabular-nums;white-space:nowrap}
+.st.danger{border-color:var(--bad);animation:pulse .6s infinite alternate}.st.danger b{color:var(--bad)}
+#snd{flex:none;width:44px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:18px;cursor:pointer}
+#stage{flex:1;position:relative;display:flex;flex-direction:column;overflow:hidden;margin:0 8px;border-radius:14px;border:1px solid var(--line);touch-action:none}
+#field{flex:1;background:repeating-linear-gradient(115deg,#142a24 0 18px,#162f28 18px 36px);transition:box-shadow .3s}
+#field.warn{box-shadow:inset 0 0 0 3px var(--bad),inset 0 0 40px #ff6b5e55}
+#bins{flex:none;display:flex;gap:4px;padding:8px 6px;background:#0b1814;border-top:2px solid var(--line)}
+.bin{--c:#fff;flex:1;min-width:0;height:clamp(92px,18vh,128px);position:relative;overflow:hidden;border:3px solid var(--c);border-radius:8px 8px 14px 14px;background:color-mix(in srgb,var(--c) 14%,#0b1814);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;transition:transform .15s,box-shadow .15s}
+.bin .fill{position:absolute;left:0;right:0;bottom:0;height:0;background:var(--c);opacity:.38;transition:height .35s}
+.bin i{font-style:normal;font-size:clamp(22px,6vw,34px);position:relative}
+.bin span{font-size:clamp(9px,2.5vw,13px);line-height:1.1;font-weight:700;position:relative;padding:0 2px}
+.bin.hot{transform:translateY(-6px) scale(1.04);box-shadow:0 0 0 3px var(--c),0 0 24px var(--c)}
+.bin.shake{animation:shake .35s}.bin.full{animation:full .6s}.bin.new{animation:newbin .7s}
+.item{position:absolute;width:64px;height:64px;border-radius:16px;background:#f3ecd9;color:#27332e;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab;touch-action:none;z-index:5;box-shadow:0 3px 0 #b9ae8f,0 6px 10px #0006}
+.item b{font-size:28px;line-height:1.1;font-weight:400}.item small{font-size:9.5px;font-weight:700;line-height:1;text-align:center;padding:0 2px}
+.item.pop{animation:pop .35s}.item.back{transition:left .25s,top .25s}
+.item.drag{z-index:50;cursor:grabbing;transform:scale(1.18) rotate(-4deg);box-shadow:0 10px 18px #0008}
+#ov{position:fixed;inset:0;background:#0a1512e6;display:flex;align-items:center;justify-content:center;z-index:100;padding:14px;overflow:auto}
+#ov[hidden]{display:none}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;max-width:440px;width:100%;max-height:100%;overflow:auto}
+.card h1{margin:0 0 6px;font-size:30px}.card h2{margin:0 0 10px;font-size:24px}
+.card p,.card li{color:var(--dim);font-size:14px;line-height:1.5;margin:4px 0}
+.card ul{padding-left:18px;margin:8px 0}
+.row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+button.btn{flex:1;padding:12px 14px;font:inherit;font-weight:700;border-radius:12px;border:1px solid var(--line);background:#20403a;color:var(--ink);cursor:pointer}
+button.btn.main{background:var(--good);color:#0b2417;border-color:var(--good)}
+button.btn:focus-visible,#snd:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.stats div{background:#0f211c;border-radius:10px;padding:8px 10px}.stats small{color:var(--dim);display:block;font-size:12px}.stats b{font-size:20px}
+input{width:100%;padding:11px;font:inherit;border-radius:10px;border:1px solid var(--line);background:#0f211c;color:var(--ink)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--line)}
+th{color:var(--dim);font-weight:600}td:nth-child(2),th:nth-child(2){text-align:left;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr.me td{color:var(--gold);font-weight:700}
+.tc{overflow-x:auto}
+#toast{position:fixed;left:50%;top:84px;max-width:92vw;text-align:center;transform:translateX(-50%);background:var(--gold);color:#2a2000;font-weight:800;padding:8px 18px;border-radius:99px;z-index:90;pointer-events:none;opacity:0}
+#toast.on{animation:toast 1.6s}
+.fx{position:fixed;pointer-events:none;z-index:80;left:0;top:0}
+@keyframes pop{from{transform:scale(0) rotate(-20deg)}to{transform:scale(1)}}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+@keyframes full{40%{transform:scale(1.12);box-shadow:0 0 30px var(--c)}}
+@keyframes newbin{from{transform:translateY(60px);opacity:0}}
+@keyframes pulse{to{box-shadow:0 0 12px var(--bad)}}
+@keyframes toast{0%{opacity:0;transform:translate(-50%,-14px)}15%,80%{opacity:1;transform:translate(-50%,0)}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="st"><small>Очки</small><b id="hs">0</b></div>
+    <div class="st"><small>Уровень</small><b id="hl">1</b></div>
+    <div class="st"><small>Комбо</small><b id="hc">0</b></div>
+    <div class="st" id="ho"><small>Мусор</small><b id="hn">0/12</b></div>
+    <div class="st"><small>Время</small><b id="ht">0:00</b></div>
+    <button id="snd" aria-label="Звук">🔊</button>
+  </div>
+  <div id="stage"><div id="field"></div><div id="bins"></div></div>
+  <div style="height:8px"></div>
+</div>
+<div id="ov"></div>
+<div id="toast"></div>
+
+<script>
+const CATS={
+  paper:{n:'Бумага',i:'📄',c:'#3b82f6',lv:1,h:'Синий бак — макулатура',tip:'Все виды бумаги и картона: газеты, книги, журналы, упаковка из-под обуви, гофрокартон. Только сухая и чистая. Жирную, промасленную бумагу и бумагу с остатками еды бросать нельзя.'},
+  plastic:{n:'Пластик и металл',i:'🧴',c:'#eab308',lv:1,h:'Жёлтый бак — пластик и металл',tip:'Пластиковые бутылки, пакеты, контейнеры, алюминиевые банки, крышки, упаковка от йогуртов, тетрапаки. Максимально чистые, желательно сплющенные.'},
+  organic:{n:'Органика',i:'🍌',c:'#b9783f',lv:1,h:'Коричневый бак — органика',tip:'Кожура, остатки фруктов и овощей, чайные пакетики, кофейная гуща, испорченные продукты. Из них делают компост.'},
+  glass:{n:'Стекло',i:'🍾',c:'#22c55e',lv:2,h:'Зелёный бак — стекло',tip:'Бутылки, банки, осколки. Снимите крышки и пробки, промойте тару. Стекло перерабатывается бесконечно без потери качества.'},
+  hazard:{n:'Опасные',i:'🔋',c:'#ef4444',lv:3,h:'Красный бак — опасные отходы',tip:'Батарейки, лампы, электроника, химикаты, лекарства. Всё, что содержит вредные вещества, нельзя выбрасывать с обычным мусором.'},
+  rest:{n:'Прочее',i:'🗑️',c:'#9aa5b1',lv:4,h:'Чёрный бак — несортируемые отходы',tip:'Всё, что нельзя переработать: загрязнённые материалы, старые губки, использованные салфетки, строительный мусор.'}
+};
+const ITEMS=[
+ ['📄','лист','paper'],['📰','газета','paper'],['📚','книги','paper'],['📦','картон','paper'],['📔','журнал','paper'],
+ ['🧴','бутылка','plastic'],['🛍️','пакет','plastic'],['🥫','жестянка','plastic'],['🧃','тетрапак','plastic'],['🥤','контейнер','plastic'],
+ ['🍌','кожура','organic'],['🍎','огрызок','organic'],['☕','кофейная гуща','organic'],['🍵','чайный пакетик','organic'],['🥦','овощи','organic'],
+ ['🍾','бутылка','glass'],['🫙','банка','glass'],
+ ['🔋','батарейка','hazard'],['💡','лампа','hazard'],['📱','телефон','hazard'],['💻','ноутбук','hazard'],['🧪','химикаты','hazard'],['💊','лекарства','hazard'],['🎮','приставка','hazard'],
+ ['🧽','старая губка','rest'],['🧻','салфетка','rest'],['🧱','строймусор','rest'],['🍕','жирная бумага','rest']
+];
+const LV=[0,50,150,300],CAP=6,WARN=12,MAXO=18,KEY='trash-sort-leaderboard-v1';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const mult=c=>c>=10?5:c>=7?3:c>=4?2:1;
+const fmt=t=>Math.floor(t/60)+':'+String(t%60).padStart(2,'0');
+let S=null,muted=false,spawnT=0,tickT=0,AC=null;
+
+/* ---------- sound ---------- */
+function snd(f,d=.12,type='sine',v=.12,when=0){
+  if(muted)return;
+  try{
+    AC=AC||new(window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==='suspended')AC.resume();
+    const o=AC.createOscillator(),g=AC.createGain(),s=AC.currentTime+when;
+    o.type=type;o.frequency.value=f;
+    g.gain.setValueAtTime(v,s);g.gain.exponentialRampToValueAtTime(.001,s+d);
+    o.connect(g);g.connect(AC.destination);o.start(s);o.stop(s+d);
+  }catch(e){}
+}
+const sOK=()=>{snd(520,.1,'triangle');snd(780,.14,'triangle',.12,.08)};
+const sBad=()=>{snd(150,.3,'sawtooth',.13)};
+const sFull=()=>[523,659,784,1047].forEach((f,i)=>snd(f,.18,'square',.07,i*.07));
+const sLevel=()=>[392,494,587,784,988].forEach((f,i)=>snd(f,.2,'triangle',.12,i*.09));
+const sOver=()=>[400,320,240,160].forEach((f,i)=>snd(f,.3,'sawtooth',.1,i*.18));
+$('snd').onclick=()=>{muted=!muted;$('snd').textContent=muted?'🔇':'🔊'};
+
+/* ---------- effects ---------- */
+function burst(x,y,color,n=14){
+  for(let i=0;i<n;i++){
+    const p=document.createElement('div');p.className='fx';
+    const s=5+Math.random()*7;
+    p.style.cssText=`width:${s}px;height:${s}px;border-radius:50%;background:${color}`;
+    document.body.appendChild(p);
+    const a=Math.random()*6.28,d=40+Math.random()*70;
+    p.animate([{transform:`translate(${x}px,${y}px)`,opacity:1},
+      {transform:`translate(${x+Math.cos(a)*d}px,${y+Math.sin(a)*d+30}px)`,opacity:0}],
+      {duration:600+Math.random()*300,easing:'ease-out'}).onfinish=()=>p.remove();
+  }
+}
+function floatTxt(x,y,t,color){
+  const p=document.createElement('div');p.className='fx';
+  p.style.cssText=`font:800 22px "Trebuchet MS",sans-serif;color:${color};text-shadow:0 2px 4px #000a`;
+  p.textContent=t;document.body.appendChild(p);
+  p.animate([{transform:`translate(${x-20}px,${y}px)`,opacity:1},{transform:`translate(${x-20}px,${y-70}px)`,opacity:0}],
+    {duration:900,easing:'ease-out'}).onfinish=()=>p.remove();
+}
+function toast(t){const e=$('toast');e.textContent=t;e.classList.remove('on');void e.offsetWidth;e.classList.add('on')}
+
+/* ---------- game ---------- */
+function newState(){return{score:0,combo:0,maxCombo:0,ok:0,tries:0,items:[],level:1,time:0,over:false,fills:{}}}
+function start(){
+  clearTimeout(spawnT);clearInterval(tickT);
+  document.querySelectorAll('.item').forEach(e=>e.remove());
+  S=newState();$('bins').innerHTML='';$('field').classList.remove('warn');
+  $('ov').hidden=true;buildBins();hud();
+  add();add();spawn();
+  tickT=setInterval(tick,1000);
+}
+function buildBins(){
+  Object.entries(CATS).forEach(([k,c])=>{
+    if(c.lv>S.level||document.querySelector(`.bin[data-cat="${k}"]`))return;
+    const b=document.createElement('div');b.className='bin new';b.dataset.cat=k;b.style.setProperty('--c',c.c);
+    b.innerHTML=`<div class="fill"></div><i>${c.i}</i><span>${c.n}</span>`;
+    $('bins').appendChild(b);
+  });
+}
+function spawn(){
+  if(S.over)return;
+  add();
+  spawnT=setTimeout(spawn,Math.max(650,2600-S.level*230-S.time*8));
+}
+function add(){
+  if(S.over)return;
+  const pool=ITEMS.filter(i=>CATS[i[2]].lv<=S.level),it=pool[Math.random()*pool.length|0];
+  const f=$('field').getBoundingClientRect();
+  let x,y;
+  for(let k=0;k<12;k++){
+    x=8+Math.random()*Math.max(1,f.width-80);y=8+Math.random()*Math.max(1,f.height-84);
+    if(S.items.every(e=>Math.hypot(e._x-x,e._y-y)>58))break;
+  }
+  const el=document.createElement('div');el.className='item pop';
+  el.innerHTML=`<b>${it[0]}</b><small>${it[1]}</small>`;
+  el._cat=it[2];el._ico=it[0];el._lbl=it[1];el._x=x;el._y=y;el.style.left=x+'px';el.style.top=y+'px';
+  el.addEventListener('pointerdown',down);
+  $('stage').appendChild(el);S.items.push(el);hud();
+  if(S.items.length>=MAXO)end();
+}
+function tick(){
+  if(S.over)return;
+  S.time++;
+  if(S.items.length>WARN){
+    addScore(-2);
+    const r=$('field').getBoundingClientRect();floatTxt(r.left+r.width/2,r.top+r.height/2,'−2 переполнение',getComputedStyle(document.documentElement).getPropertyValue('--bad'));
+    snd(200,.1,'square',.07);
+  }
+  hud();
+}
+function addScore(n){
+  S.score=Math.max(0,S.score+n);
+  let lv=1;LV.forEach((t,i)=>{if(S.score>=t)lv=i+1});
+  if(lv>S.level){S.level=lv;buildBins();sLevel();toast('Уровень '+lv+': '+Object.values(CATS).filter(c=>c.lv===lv).map(c=>c.i+' '+c.n).join(', '))}
+}
+function hud(){
+  if(!S)return;
+  const n=S.items.length,m=mult(S.combo);
+  $('hs').textContent=S.score;$('hl').textContent=S.level;
+  $('hc').textContent=S.combo+(m>1?' ×'+m:'');
+  $('hn').textContent=n+'/'+WARN;$('ht').textContent=fmt(S.time);
+  $('ho').classList.toggle('danger',n>WARN);$('field').classList.toggle('warn',n>WARN);
+}
+
+/* ---------- drag & drop (mouse + touch via pointer events) ---------- */
+function binAt(x,y){
+  return[...document.querySelectorAll('.bin')].find(b=>{const r=b.getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom});
+}
+function down(e){
+  if(S.over)return;
+  const el=e.currentTarget,r=el.getBoundingClientRect();
+  el.setPointerCapture(e.pointerId);
+  el._dx=e.clientX-r.left;el._dy=e.clientY-r.top;
+  el.classList.remove('back');el.classList.add('drag');
+  el.onpointermove=mv;el.onpointerup=up;el.onpointercancel=up;
+  e.preventDefault();
+}
+function mv(e){
+  const el=e.currentTarget,st=$('stage').getBoundingClientRect(),b=binAt(e.clientX,e.clientY);
+  el.style.left=(e.clientX-st.left-el._dx)+'px';el.style.top=(e.clientY-st.top-el._dy)+'px';
+  document.querySelectorAll('.bin').forEach(x=>x.classList.toggle('hot',x===b));
+}
+function back(el){
+  el.classList.add('back');el.style.left=el._x+'px';el.style.top=el._y+'px';
+  setTimeout(()=>el.classList.remove('back'),300);
+}
+function up(e){
+  const el=e.currentTarget;
+  el.classList.remove('drag');el.onpointermove=el.onpointerup=el.onpointercancel=null;
+  document.querySelectorAll('.bin').forEach(x=>x.classList.remove('hot'));
+  const b=binAt(e.clientX,e.clientY);
+  if(e.type==='pointercancel'||!b||S.over){back(el);return}
+  drop(el,b,e.clientX,e.clientY);
+}
+function drop(el,b,x,y){
+  const cat=b.dataset.cat,c=CATS[cat];S.tries++;
+  if(el._cat===cat){
+    S.ok++;S.combo++;S.maxCombo=Math.max(S.maxCombo,S.combo);
+    const m=mult(S.combo),pts=10*m;
+    S.items=S.items.filter(i=>i!==el);el.remove();
+    addScore(pts);sOK();burst(x,y,c.c);floatTxt(x,y-10,'+'+pts,c.c);
+    if([4,7,10].includes(S.combo)){toast('Комбо ×'+m+'!');snd(880,.2,'square',.07,.1)}
+    S.fills[cat]=(S.fills[cat]||0)+1;
+    if(S.fills[cat]>=CAP){
+      S.fills[cat]=0;addScore(20);sFull();burst(x,y,'#ffd166',30);floatTxt(x,y-40,'Контейнер полон! +20','#ffd166');
+      b.classList.remove('full');void b.offsetWidth;b.classList.add('full');
+    }
+    b.querySelector('.fill').style.height=(S.fills[cat]/CAP*100)+'%';
+  }else{
+    S.combo=0;addScore(-5);sBad();toast(el._ico+' '+el._lbl+' → '+CATS[el._cat].h.toLowerCase());floatTxt(x,y-10,'−5','#ff6b5e');burst(x,y,'#ff6b5e',8);
+    b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');back(el);
+  }
+  hud();
+}
+
+/* ---------- leaderboard ---------- */
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return[]}}
+function save(list){try{localStorage.setItem(KEY,JSON.stringify(list))}catch(e){}}
+function lastName(){try{return localStorage.getItem(KEY+'-name')||''}catch(e){return''}}
+
+function ov(html){$('ov').innerHTML='<div class="card">'+html+'</div>';$('ov').hidden=false}
+function showStart(){
+  ov(`<h1>🗑️ Сортировщик</h1>
+  <p>Перетаскивайте мусор в бак нужного цвета. Не давайте ему копиться!</p>
+  <ul>
+   <li>Верно: +10 × множитель комбо (×2 с 4, ×3 с 7, ×5 с 10)</li>
+   <li>Ошибка: −5 очков, сброс комбо и подсказка, куда предмет нужно было бросить</li>
+   <li>Больше ${WARN} предметов: −2 очка в секунду. ${MAXO} — игра окончена</li>
+   <li>Бак заполнен (${CAP} предметов): +20 очков</li>
+   <li>50 очков — зелёный бак (стекло), 150 — красный (опасные отходы), 300 — чёрный (несортируемые)</li>
+  </ul>
+  <div class="row"><button class="btn main" data-act="play">Играть</button><button class="btn" data-act="guide">Памятка</button><button class="btn" data-act="board">Рекорды</button></div>`);
+}
+function showGuide(){
+  const items=Object.values(CATS).map(c=>`<p style="border-left:4px solid ${c.c};padding-left:10px;margin:10px 0"><b style="color:var(--ink)">${c.i} ${c.h}</b><br>${c.tip}</p>`).join('');
+  ov(`<h2>Памятка по сортировке</h2>${items}<div class="row"><button class="btn main" data-act="play">Играть</button><button class="btn" data-act="menu">Меню</button></div>`);
+}
+function showBoard(hl=-1){
+  const l=load();
+  const rows=l.length?l.map((r,i)=>`<tr class="${i===hl?'me':''}"><td>${i+1}</td><td>${esc(r.name)}</td><td>${r.score}</td><td>${r.combo}</td><td>${r.acc}%</td><td>${fmt(r.time)}</td></tr>`).join(''):'<tr><td colspan="6" style="text-align:center">Пока нет результатов. Сыграйте первую партию.</td></tr>';
+  ov(`<h2>🏆 Топ-10</h2><div class="tc"><table><tr><th>#</th><th>Имя</th><th>Очки</th><th>Комбо</th><th>Точн.</th><th>Время</th></tr>${rows}</table></div>
+  <div class="row"><button class="btn main" data-act="play">Играть</button><button class="btn" data-act="menu">Меню</button></div>`);
+}
+function end(){
+  if(S.over)return;
+  S.over=true;clearTimeout(spawnT);clearInterval(tickT);sOver();hud();
+  const acc=S.tries?Math.round(S.ok/S.tries*100):0;S.acc=acc;
+  ov(`<h2>Куча переполнилась</h2>
+  <div class="stats"><div><small>Очки</small><b>${S.score}</b></div><div><small>Лучшее комбо</small><b>${S.maxCombo}</b></div>
+  <div><small>Точность</small><b>${acc}%</b></div><div><small>Время игры</small><b>${fmt(S.time)}</b></div></div>
+  <label for="nm" style="font-size:13px;color:var(--dim)">Ваше имя для таблицы рекордов</label>
+  <input id="nm" maxlength="14" placeholder="Игрок" value="${esc(lastName())}" autocomplete="off">
+  <div class="row"><button class="btn main" data-act="save">Сохранить результат</button><button class="btn" data-act="play">Ещё раз</button></div>`);
+}
+function saveScore(){
+  const name=($('nm').value.trim()||'Игрок').slice(0,14);
+  try{localStorage.setItem(KEY+'-name',name)}catch(e){}
+  const rec={name,score:S.score,combo:S.maxCombo,acc:S.acc,time:S.time,date:Date.now()};
+  const l=load();l.push(rec);
+  l.sort((a,b)=>b.score-a.score||a.time-b.time);
+  const top=l.slice(0,10);save(top);
+  showBoard(top.indexOf(rec));
+}
+$('ov').addEventListener('click',e=>{
+  const a=e.target.closest('[data-act]');if(!a)return;
+  ({play:start,board:()=>showBoard(),menu:showStart,save:saveScore,guide:showGuide})[a.dataset.act]();
+});
+showStart();
+</script>
+</body>
+</html>
